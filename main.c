@@ -284,7 +284,7 @@ void ArrayKeyScan()
                 if (AKstate[i][j] & 0x2)
                 {
                     // 且本就为按下状态
-                    AKstate[i][j] = 0x2;  // 清除flag0x1
+                    AKstate[i][j] &= 0xFE;  // 清除flag0x1
                 }
                 else
                 {
@@ -292,12 +292,12 @@ void ArrayKeyScan()
                     if (AKstate[i][j] & 0x1)
                     {
                         // 上次已经标记
-                        AKstate[i][j] = 0x2;
+                        AKstate[i][j] ^= 0x3; // 与0x1|0x2异或 去除0x1 标记0x2
                     }
                     else
                     {
                         // 标记flag0x1
-                        AKstate[i][j] = 0x1;
+                        AKstate[i][j] |= 0x1;
                     }
                 }
             }
@@ -307,7 +307,7 @@ void ArrayKeyScan()
                 if (!(AKstate[i][j] & 0x2))
                 {
                     // 且本就为未按下状态
-                    AKstate[i][j] = 0x0;  // 清除flag0x1
+                    AKstate[i][j] &= 0xFE;  // 清除flag0x1
                 }
                 else
                 {
@@ -315,12 +315,12 @@ void ArrayKeyScan()
                     if (AKstate[i][j] & 0x1)
                     {
                         // 上次已经标记
-                        AKstate[i][j] = 0x0;
+                        AKstate[i][j] &= 0xFC;  // 清除 0x1|0x2
                     }
                     else
                     {
                         // 标记flag0x1
-                        AKstate[i][j] = 0x1 | 0x2;
+                        AKstate[i][j] |= 0x1;   // 标记
                     }
                 }
             }
