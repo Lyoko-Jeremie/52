@@ -449,6 +449,26 @@ void CallKeyCallBackFunction()
     }
 }
 
+sbit beep = P3 ^5;
+uchar BEEPFlag = 0;
+
+void BEEP()
+{
+    beep = 1;
+    BEEPFlag = 5;
+}
+
+void BEEPflush()
+{
+    if (BEEPFlag > 0)
+    {
+        --BEEPFlag;
+    }
+    else
+    {
+        beep = 0;
+    }
+}
 
 //uchar LEDStateNum = 0;
 
@@ -461,18 +481,30 @@ void cbkf(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 }
 
 
-unsigned long number = 0;
+long number = 0;
+
+uchar lock = 0;
 
 void CB_clear(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
+    {
+        lock = 0;
         number = 0;
+    }
 }
 
 void CB_Backspace(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
+    {
+        if (lock)
+        {
+            BEEP();
+            return;
+        }
         number /= 10;
+    }
 }
 
 // 7 8 9 +
@@ -480,11 +512,26 @@ void CB_Backspace(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 // 1 2 3 *
 // 0 B = /
 
+// < > C T
+
+void CB_Test(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        BEEP();
+    }
+}
+
 void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     uchar n = 0;
     if (CBKSP->edge)
     {
+        if (lock)
+        {
+            BEEP();
+            return;
+        }
         switch (keynum)
         {
             case 0:
@@ -520,10 +567,80 @@ void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
             default:
                 return;
         }
-        number *= 10;
-        number += n;
+        if ((number * 10 + n) < number || (number * 10 + n) > 4294967295)   // 越界
+        {
+            BEEP();
+            // 锁定计算
+            lock = 1;
+        }
+        else
+        {
+            number *= 10;
+            number += n;
+        }
     }
 }
+
+uchar CountNumberLenth(long number)
+{
+    uchar len = 0;
+    while (number)
+    {
+        number /= 10;
+        ++len;
+    }
+    if (0 == len)
+    {
+        len = 1;    // 显示0
+    }
+    return len;
+}
+
+// LED总长
+int LEDlong = 0;
+// LED下标
+int LEDindex = 0;
+
+void flushLEDli()
+{
+    if (LEDindex < 0)
+    {
+        LEDindex = 0;
+    }
+    if (LEDlong < 0)
+    {
+        LEDlong = 0;
+    }
+    if (LEDlong <= 3)
+    {
+        LEDindex = 0;
+        return;
+    }
+    if (LEDlong < LEDindex)
+    {
+        LEDindex = LEDlong;
+        return;
+    }
+}
+
+void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        switch (keynum)
+        {
+            case 16:    // >>
+                --LEDindex;
+                break;
+            case 17:    // <<
+                ++LEDindex;
+                break;
+            default:
+                return;
+        }
+    }
+}
+
 
 void init_key_list()
 {
@@ -547,32 +664,57 @@ void init_key_list()
     CBKeyList[14] = cbkf;   // =
     CBKeyList[15] = cbkf;   // /
 
-    CBKeyList[16] = cbkf;   // <<
-    CBKeyList[17] = cbkf;   // >>
+    CBKeyList[16] = CB_move;   // <<
+    CBKeyList[17] = CB_move;   // >>
     CBKeyList[18] = CB_clear;   // C
-    CBKeyList[19] = cbkf;
+    CBKeyList[19] = CB_Test;    // T
 }
 
 void main()
 {
-    uchar i;
-    unsigned long lsn;
+    uchar i, j;
+    long lsn;
 
+    beep = 0;
     init_key_list();
 
     while (1)
     {
         ArrayKeyScan();
+
+        // 事件响应前置操作
+        BEEPflush();
+
+        // 回调函数调用响应事件
         CallKeyCallBackFunction();
+
+        // 事件响应后置操作
+        LEDlong = CountNumberLenth(number);
+        flushLEDli();
+
         lsn = number;
-        SetLED(0, (uchar) (lsn % 10));
-        delayms(10);
-        lsn /= 10;
-        SetLED(1, (uchar) (lsn % 10));
-        delayms(10);
-        lsn /= 10;
-        SetLED(2, (uchar) (lsn % 10));
-        delayms(10);
+        // 计算下标初值
+        for (i = 0; i != LEDindex; ++i)
+        {
+            lsn /= 10;
+        }
+        // 高位消隐
+        for (j = 0; i != LEDlong && j != 3; ++i, ++j)
+        {
+            SetLED(j, (uchar) (lsn % 10));
+            delayms(5);
+            lsn /= 10;
+        }
+
+//        // debug
+//        SetLED(0, (uchar) (LEDindex % 10));
+//        delayms(5);
+//        SetLED(1, (uchar) (LEDlong % 10));
+//        delayms(5);
+
+
+
+
     }
 
 }
