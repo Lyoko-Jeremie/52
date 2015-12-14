@@ -641,6 +641,60 @@ void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
     }
 }
 
+// 符号栈与数字栈最大深度
+#define StackDeep 39
+// 现在（上次）输入的是数字还是符号  数字0 符号1
+uchar FlagNF = 0;
+// 数字列表
+pdata
+long NumberStack[StackDeep] = {0};
+uchar NumberStackHead = 0;
+// 符号列表
+pdata
+uchar FlagStack[StackDeep] = {0};
+uchar FlagStackHead = 0;
+
+void CB_Count(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        if (lock)
+        {
+            BEEP();
+            return;
+        }
+    }
+}
+
+void CB_Flag(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        if (lock)
+        {
+            BEEP();
+            return;
+        }
+        switch (keynum)
+        {
+            case 3:
+                // +
+                break;
+            case 7:
+                // -
+                break;
+            case 11:
+                // *
+                break;
+            case 15:
+                // /
+                break;
+            default:
+                return;
+        }
+    }
+}
+
 
 void init_key_list()
 {
@@ -661,7 +715,7 @@ void init_key_list()
 
     CBKeyList[12] = CB_appendN;
     CBKeyList[13] = CB_Backspace;   // B
-    CBKeyList[14] = cbkf;   // =
+    CBKeyList[14] = CB_Count;   // =
     CBKeyList[15] = cbkf;   // /
 
     CBKeyList[16] = CB_move;   // <<
