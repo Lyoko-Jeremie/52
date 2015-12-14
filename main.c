@@ -450,33 +450,121 @@ void CallKeyCallBackFunction()
 }
 
 
-uchar LEDStateNum = 0;
+//uchar LEDStateNum = 0;
 
 void cbkf(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
     {
-        LEDStateNum = keynum;
+//        LEDStateNum = keynum;
     }
+}
+
+
+unsigned long number = 0;
+
+void CB_clear(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+        number = 0;
+}
+
+void CB_Backspace(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+        number /= 10;
+}
+
+// 7 8 9 +
+// 4 5 6 -
+// 1 2 3 *
+// 0 B = /
+
+void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    uchar n = 0;
+    if (CBKSP->edge)
+    {
+        switch (keynum)
+        {
+            case 0:
+                n = 7;
+                break;
+            case 1:
+                n = 8;
+                break;
+            case 2:
+                n = 9;
+                break;
+            case 4:
+                n = 4;
+                break;
+            case 5:
+                n = 5;
+                break;
+            case 6:
+                n = 6;
+                break;
+            case 8:
+                n = 1;
+                break;
+            case 9:
+                n = 2;
+                break;
+            case 10:
+                n = 3;
+                break;
+            case 12:
+                n = 0;
+                break;
+            default:
+                return;
+        }
+        number *= 10;
+        number += n;
+    }
+}
+
+void init_key_list()
+{
+    CBKeyList[0] = CB_appendN;
+    CBKeyList[1] = CB_appendN;
+    CBKeyList[2] = CB_appendN;
+    CBKeyList[3] = cbkf;    // +
+
+    CBKeyList[4] = CB_appendN;
+    CBKeyList[5] = CB_appendN;
+    CBKeyList[6] = CB_appendN;
+    CBKeyList[7] = cbkf;    // -
+
+    CBKeyList[8] = CB_appendN;
+    CBKeyList[9] = CB_appendN;
+    CBKeyList[10] = CB_appendN;
+    CBKeyList[11] = cbkf;   // *
+
+    CBKeyList[12] = CB_appendN;
+    CBKeyList[13] = CB_Backspace;   // B
+    CBKeyList[14] = cbkf;   // =
+    CBKeyList[15] = cbkf;   // /
+
+    CBKeyList[16] = cbkf;   // <<
+    CBKeyList[17] = cbkf;   // >>
+    CBKeyList[18] = CB_clear;   // C
+    CBKeyList[19] = cbkf;
 }
 
 void main()
 {
     uchar i;
-    uchar lsn;
+    unsigned long lsn;
 
-
-    for (i = 0; i != 20; ++i)
-    {
-        CBKeyList[i] = cbkf;
-    }
-
+    init_key_list();
 
     while (1)
     {
         ArrayKeyScan();
         CallKeyCallBackFunction();
-        lsn = LEDStateNum;
+        lsn = number;
         SetLED(0, (uchar) (lsn % 10));
         delayms(10);
         lsn /= 10;
