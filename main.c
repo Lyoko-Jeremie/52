@@ -1,12 +1,35 @@
 #include "reg52.h"
 #include "intrins.h"
 
+#ifndef __C51__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
+#endif // __C51__
 
 #define uint unsigned int
 #define uchar unsigned char
 #define null 0
+
+// 下面这个条件编译屏蔽Keil编译器的检测行为
+// 并为CLion语法检测提供伪类型对象
+#ifndef __C51__
+#define pdata
+#define idata
+typedef uchar sbit;
+//extern sfr P0 = 0xFF;
+//extern sfr P1 = 0xFF;
+//extern sfr P2 = 0xFF;
+//extern sfr P3 = 0xFF;
+
+//  存储器类型
+//  DATA 直接寻址的片内数据存储器(128B),访问速度最快
+//  BDATA 可位寻址的片内数据存储器(16B),允许位与字节混合访问
+//  IDATA 间接访问的片内数据存储器(256B),允许访问全部片内地址
+//  PDATA 分页寻址的片外数据存储器(256B),用MOVX @Ri指令访问
+//  XDATA 片外数据存储器(64KB),用MOVX @DPTR指令访问
+//  CODE 程序存储器(64KB),用MOVC @A+DPTR指令访问
+
+#endif // __C51__
 
 
 void delayms(uint x)
@@ -228,15 +251,15 @@ uchar KeyIsUp(uchar n)
 }
 
 
-sbit row0 = P2 ^7;
-sbit row1 = P2 ^6;
-sbit row2 = P2 ^5;
-sbit row3 = P2 ^4;
+sbit row0 = P2 ^4;
+sbit row1 = P2 ^5;
+sbit row2 = P2 ^6;
+sbit row3 = P2 ^7;
 
-sbit col0 = P2 ^0;
-sbit col1 = P2 ^1;
-sbit col2 = P2 ^2;
-sbit col3 = P2 ^3;
+sbit col0 = P2 ^3;
+sbit col1 = P2 ^2;
+sbit col2 = P2 ^1;
+sbit col3 = P2 ^0;
 
 // 0x2 是否确实按下
 // 0x1 是否程检测到过一次与是否按下状态不符
@@ -361,22 +384,25 @@ void ArrayKeyScan()
     }
 }
 
+
+// error C249: 'DATA': SEGMENT TOO LARGE
 // 按键回调函数附属信息结构体
 typedef struct
 {
     uchar edge; // 按下沿1或松开沿0
-    void *V0;
 } CallBack_Key_Struct, *CallBack_Key_Struct_Ptr;
 
 // 按键回调函数类型定义
-// 传入附属信息结构图  传出附属信息结构体
-typedef CallBack_Key_Struct_Ptr(CallBack_Key)(CallBack_Key_Struct_Ptr);
+// 传入附属信息结构体指针
+typedef void (CallBack_Key)(CallBack_Key_Struct_Ptr CBKSP, uchar keynum);
 
 // 按键回调函数附属信息结构体表
-CallBack_Key_Struct KBKeySList[20] = {null};
+pdata
+CallBack_Key_Struct KBKeySList[20] = {0};
 
 // 按键回调函数表
 // 前16个为矩阵键盘 0~15 后4个为板载键盘 16~19
+pdata
 CallBack_Key *CBKeyList[20] = {null};
 
 // 板载键盘状态表
@@ -385,26 +411,26 @@ uchar OnBoardKeyState[4] = {0, 0, 0, 0};
 // 调用按键回调函数
 void CallKeyCallBackFunction()
 {
-    uchar i;
+    uchar i, o2, o3;
     // 先检查板载键盘
     for (i = 0; i != 4; ++i)
     {
         if (OnBoardKeyState[i])
         {
-            if (KeyIsUp(i))
+            if (KeyIsUp((uchar) (i + 1)))
             {
                 OnBoardKeyState[i] = 0;
                 KBKeySList[i + 16].edge = 0;
-                KBKeySList[i + 16] = *(CBKeyList[i + 16])(&KBKeySList[i + 16]);
+                (CBKeyList[i + 16])(&KBKeySList[i + 16], (char) (i + 16));
             }
         }
         else
         {
-            if (KeyIsDown(i))
+            if (KeyIsDown((uchar) (i + 1)))
             {
                 OnBoardKeyState[i] = 1;
                 KBKeySList[i + 16].edge = 1;
-                KBKeySList[i + 16] = *(CBKeyList[i + 16])(&KBKeySList[i + 16]);
+                (CBKeyList[i + 16])(&KBKeySList[i + 16], (char) (i + 16));
             }
         }
     }
@@ -412,73 +438,126 @@ void CallKeyCallBackFunction()
     for (i = 0; i != 16; ++i)
     {
         // 如果矩阵键盘现态与上态不同
-        if ((AKstate[i / 4][i % 4] & 0x2) != (AKstate[i / 4][i % 4] & 0x3))
+        o2 = (uchar) (AKstate[i / 4][i % 4] & 0x2 ? 1 : 0);
+        o3 = (uchar) (AKstate[i / 4][i % 4] & 0x3 ? 1 : 0);
+        if (o2 != o3)
         {
-            KBKeySList[i].edge = (uchar) (AKstate[i / 4][i % 4] & 0x2);
-            KBKeySList[i] = *(CBKeyList[i])(&KBKeySList[i]);
             AKstate[i / 4][i % 4] ^= 0x3;   // 翻转上态使其与现态相等
+            KBKeySList[i].edge = (uchar) (AKstate[i / 4][i % 4] & 0x3 ? 1 : 0);
+            (CBKeyList[i])(&KBKeySList[i], i);
         }
     }
 }
 
+
+uchar LEDStateNum = 0;
+
+void cbkf(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        LEDStateNum = keynum;
+    }
+}
 
 void main()
 {
+    uchar i;
+    uchar lsn;
 
-    // Key1~4
-    uchar kflag1 = 0;
 
-    char i, ie;
-    uchar temp;
+    for (i = 0; i != 20; ++i)
+    {
+        CBKeyList[i] = cbkf;
+    }
+
 
     while (1)
     {
-        if (kflag1 && KeyIsUp(1))
-        {
-            kflag1 = 0;
-        }
-        if (!kflag1 && KeyIsDown(1))
-        {
-            kflag1 = 1;
-        }
-
         ArrayKeyScan();
+        CallKeyCallBackFunction();
+        lsn = LEDStateNum;
+        SetLED(0, (uchar) (lsn % 10));
         delayms(10);
-        ArrayKeyScan();
+        lsn /= 10;
+        SetLED(1, (uchar) (lsn % 10));
+        delayms(10);
+        lsn /= 10;
+        SetLED(2, (uchar) (lsn % 10));
+        delayms(10);
+    }
+
+}
 
 
-        //debug
-//        if (AKstate[0][0] & 0x2)
+
+
+
+
+
+
+
+
+
+
+
+//void main()
+//{
+//
+//    // Key1~4
+//    uchar kflag1 = 0;
+//
+//    char i, ie;
+//    uchar temp;
+//
+//    while (1)
+//    {
+//        if (kflag1 && KeyIsUp(1))
 //        {
-//            P1 = 0xFE;
+//            kflag1 = 0;
+//        }
+//        if (!kflag1 && KeyIsDown(1))
+//        {
+//            kflag1 = 1;
+//        }
+//
+//        ArrayKeyScan();
+//        delayms(10);
+//        ArrayKeyScan();
+//
+//
+//        //debug
+////        if (AKstate[0][0] & 0x2)
+////        {
+////            P1 = 0xFE;
+////        }
+////        else
+////        {
+////            P1 = 0xFF;
+////        }
+//
+//        if (kflag1) // 扫描AKstate前半段或后半段
+//        {
+//            i = 8;
+//            ie = 16;
 //        }
 //        else
 //        {
-//            P1 = 0xFF;
+//            i = 0;
+//            ie = 8;
 //        }
-
-        if (kflag1) // 扫描AKstate前半段或后半段
-        {
-            i = 8;
-            ie = 16;
-        }
-        else
-        {
-            i = 0;
-            ie = 8;
-        }
-
-        temp = 0;
-        for (; i != ie; ++i)
-        {
-            temp <<= 1;
-            if (AKstate[i / 4][i % 4] & 0x2) temp |= 0x1;
-        }
-        P1 = ~temp;
-
-
-    }
-}
+//
+//        temp = 0;
+//        for (; i != ie; ++i)
+//        {
+//            temp <<= 1;
+//            if (AKstate[i / 4][i % 4] & 0x2) temp |= 0x1;
+//        }
+//        P1 = ~temp;
+//
+//
+//    }
+//}
 
 
 
@@ -824,4 +903,6 @@ void main()
 
 
 
+#ifndef __C51__
 #pragma clang diagnostic pop
+#endif // __C51__
