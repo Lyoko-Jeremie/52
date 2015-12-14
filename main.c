@@ -6,6 +6,7 @@
 
 #define uint unsigned int
 #define uchar unsigned char
+#define null 0
 
 
 void delayms(uint x)
@@ -360,27 +361,65 @@ void ArrayKeyScan()
     }
 }
 
+// 按键回调函数附属信息结构体
+typedef struct
+{
+    uchar edge; // 按下沿1或松开沿0
+    void *V0;
+} CallBack_Key_Struct, *CallBack_Key_Struct_Ptr;
 
+// 按键回调函数类型定义
+// 传入附属信息结构图  传出附属信息结构体
+typedef CallBack_Key_Struct_Ptr(CallBack_Key)(CallBack_Key_Struct_Ptr);
 
+// 按键回调函数附属信息结构体表
+CallBack_Key_Struct KBKeySList[20] = {null};
 
+// 按键回调函数表
+// 前16个为矩阵键盘 0~15 后4个为板载键盘 16~19
+CallBack_Key *CBKeyList[20] = {null};
 
+// 板载键盘状态表
+uchar OnBoardKeyState[4] = {0, 0, 0, 0};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// 调用按键回调函数
+void CallKeyCallBackFunction()
+{
+    uchar i;
+    // 先检查板载键盘
+    for (i = 0; i != 4; ++i)
+    {
+        if (OnBoardKeyState[i])
+        {
+            if (KeyIsUp(i))
+            {
+                OnBoardKeyState[i] = 0;
+                KBKeySList[i + 16].edge = 0;
+                KBKeySList[i + 16] = *(CBKeyList[i + 16])(&KBKeySList[i + 16]);
+            }
+        }
+        else
+        {
+            if (KeyIsDown(i))
+            {
+                OnBoardKeyState[i] = 1;
+                KBKeySList[i + 16].edge = 1;
+                KBKeySList[i + 16] = *(CBKeyList[i + 16])(&KBKeySList[i + 16]);
+            }
+        }
+    }
+    // 矩阵键盘
+    for (i = 0; i != 16; ++i)
+    {
+        // 如果矩阵键盘现态与上态不同
+        if ((AKstate[i / 4][i % 4] & 0x2) != (AKstate[i / 4][i % 4] & 0x3))
+        {
+            KBKeySList[i].edge = (uchar) (AKstate[i / 4][i % 4] & 0x2);
+            KBKeySList[i] = *(CBKeyList[i])(&KBKeySList[i]);
+            AKstate[i / 4][i % 4] ^= 0x3;   // 翻转上态使其与现态相等
+        }
+    }
+}
 
 
 void main()
