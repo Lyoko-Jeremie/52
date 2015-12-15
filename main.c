@@ -1,5 +1,5 @@
 #include "reg52.h"
-#include "intrins.h"
+#include "intrins.h"    // _nop_()
 
 #ifndef __C51__
 #pragma clang diagnostic push
@@ -34,10 +34,20 @@ typedef uchar sbit;
 
 void delayms(uint x)
 {
-    uint i, j;
-    for (i = x; i > 0; --i)
-        for (j = 110; j > 0; --j)
-            /*empty*/  ;
+    uint k;
+    uchar i, j;
+    for (k = x; k > 0; --k)
+    {
+        // 参数由 STC-ISP 计算得来
+        // @22.1184MHz
+        _nop_();
+        i = 4;
+        j = 146;
+        do
+        {
+            while (--j);
+        } while (--i);
+    }
 }
 
 
