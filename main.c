@@ -567,7 +567,9 @@ void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
             default:
                 return;
         }
-        if ((number * 10 + n) < number || (number * 10 + n) > 4294967295)   // 越界
+        // 溢出计算
+        // 裁掉最高位
+        if (214748355L <= number)
         {
             BEEP();
             // 锁定计算
@@ -642,12 +644,14 @@ void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 }
 
 // 符号栈与数字栈最大深度
-#define StackDeep 39
+#define StackDeep 32
 // 现在（上次）输入的是数字还是符号  数字0 符号1
 uchar FlagNF = 0;
 // 数字列表
 pdata
 long NumberStack[StackDeep] = {0};
+pdata
+uchar NumberLenStack[StackDeep] = {0};
 uchar NumberStackHead = 0;
 // 符号列表
 pdata
