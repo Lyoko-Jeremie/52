@@ -112,8 +112,14 @@ uchar TranslateNumber(uchar Num)
             return 0x07;
         case 8:
             return 0x7F;
-        case 9:
-            return 0x67;
+        case 11:    // +
+            return 0x70;
+        case 12:    // -
+            return 0x40;
+        case 13:    // *
+            return 0x76;
+        case 14:    // /
+            return 0x64;
         default:
             return 0x00;
     }
@@ -625,18 +631,67 @@ void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 
 // 符号栈与数字栈最大深度
 #define StackDeep 32
-// 现在（上次）输入的是数字还是符号  数字0 符号1
-uchar FlagNF = 0;
+// 保存压栈求值顺序  数字0 符号1
+// TODO 加入栈操作函数控制
+xdata
+uchar FlagNF[StackDeep * 3] = {0};
+
 // 数字列表
 xdata
 long NumberStack[StackDeep] = {0};
 xdata
 uchar NumberLenStack[StackDeep] = {0};
+// 表头位置 表头总是在第一个空位处
 uchar NumberStackHead = 0;
+
 // 符号列表
 xdata
 uchar FlagStack[StackDeep] = {0};
+// 表头位置
 uchar FlagStackHead = 0;
+
+// 栈内信息总长
+unsigned long InStackDataLenth = 0;
+
+// 栈操作函数
+void PushNumber(long number)
+{
+    uchar len = CountNumberLenth(number);
+    NumberStack[NumberStackHead] = number;
+    NumberLenStack[NumberStackHead] = len;
+    InStackDataLenth += len;
+    ++NumberStackHead;
+}
+
+long TopNumber()
+{
+    return NumberStack[NumberStackHead];
+}
+
+void PopNumber()
+{
+    --NumberStackHead;
+    InStackDataLenth -= NumberLenStack[NumberStackHead];
+}
+
+void PushFlag(uchar flag)
+{
+    FlagStack[FlagStackHead] = flag;
+    ++InStackDataLenth;
+    ++FlagStackHead;
+}
+
+uchar TopFlag()
+{
+    return FlagStack[FlagStackHead];
+}
+
+void PopFlag()
+{
+    --FlagStackHead;
+    --InStackDataLenth;
+}
+
 
 void CB_Count(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
@@ -708,57 +763,109 @@ void init_key_list()
     CBKeyList[19] = CB_Test;    // T
 }
 
-void main()
-{
-    uchar i, j;
-    long lsn;
 
-    beep = 0;
-    init_key_list();
+// + - * / LED debug
+//uchar Flag = 0;
+//
+//void CB_FlagTest(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+//{
+//    if (CBKSP->edge)
+//    {
+//        Flag = (uchar) (keynum - 5);
+//    }
+//}
+//
+//
+//void main()
+//{
+//
+//    beep = 0;
+//
+//    CBKeyList[0] = cbkf;
+//    CBKeyList[1] = cbkf;
+//    CBKeyList[2] = cbkf;
+//    CBKeyList[3] = cbkf;
+//    CBKeyList[4] = cbkf;
+//    CBKeyList[5] = cbkf;
+//    CBKeyList[6] = cbkf;
+//    CBKeyList[7] = cbkf;
+//    CBKeyList[8] = cbkf;
+//    CBKeyList[9] = cbkf;
+//    CBKeyList[10] = cbkf;
+//    CBKeyList[11] = cbkf;
+//    CBKeyList[12] = cbkf;
+//    CBKeyList[13] = cbkf;
+//    CBKeyList[14] = cbkf;
+//    CBKeyList[15] = cbkf;
+//    CBKeyList[16] = CB_FlagTest;
+//    CBKeyList[17] = CB_FlagTest;
+//    CBKeyList[18] = CB_FlagTest;
+//    CBKeyList[19] = CB_FlagTest;
+//
+//
+//    while (1)
+//    {
+//
+//        CallKeyCallBackFunction();
+//
+//        SetLED(0, Flag);
+//
+//        delayms(10);
+//
+//
+//    }
+//
+//}
 
-    while (1)
-    {
-        ArrayKeyScan();
 
-        // 事件响应前置操作
-        BEEPflush();
-
-        // 回调函数调用响应事件
-        CallKeyCallBackFunction();
-
-        // 事件响应后置操作
-        LEDlong = CountNumberLenth(number);
-        flushLEDli();
-
-        lsn = number;
-        // 计算下标初值
-        for (i = 0; i != LEDindex; ++i)
-        {
-            lsn /= 10;
-        }
-        // 高位消隐
-        for (j = 0; i != LEDlong && j != 3; ++i, ++j)
-        {
-            SetLED(j, (uchar) (lsn % 10));
-            delayms(5);
-            lsn /= 10;
-        }
-
-//        // debug
-//        SetLED(0, (uchar) (LEDindex % 10));
-//        delayms(5);
-//        SetLED(1, (uchar) (LEDlong % 10));
-//        delayms(5);
-
-
-
-
-    }
-
-}
-
-
-
+//void main()
+//{
+//    uchar i, j;
+//    long lsn;
+//
+//    beep = 0;
+//    init_key_list();
+//
+//    while (1)
+//    {
+//        ArrayKeyScan();
+//
+//        // 事件响应前置操作
+//        BEEPflush();
+//
+//        // 回调函数调用响应事件
+//        CallKeyCallBackFunction();
+//
+//        // 事件响应后置操作
+//        LEDlong = CountNumberLenth(number);
+//        flushLEDli();
+//
+//        lsn = number;
+//        // 计算下标初值
+//        for (i = 0; i != LEDindex; ++i)
+//        {
+//            lsn /= 10;
+//        }
+//        // 高位消隐
+//        for (j = 0; i != LEDlong && j != 3; ++i, ++j)
+//        {
+//            SetLED(j, (uchar) (lsn % 10));
+//            delayms(5);
+//            lsn /= 10;
+//        }
+//
+////        // debug
+////        SetLED(0, (uchar) (LEDindex % 10));
+////        delayms(5);
+////        SetLED(1, (uchar) (LEDlong % 10));
+////        delayms(5);
+//
+//
+//
+//
+//    }
+//
+//}
 
 
 
