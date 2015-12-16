@@ -13,8 +13,15 @@
 // 下面这个条件编译屏蔽Keil编译器的检测行为
 // 并为CLion语法检测提供伪类型对象
 #ifndef __C51__
-#define pdata
+#define code
+#define data
 #define idata
+#define pdata
+#define xdata
+// STC89C516RD+ 在使用扩展区的FFH以外区域时使用xdata指令 且xdata不可超过1280
+//      使用pdata只能访问FFH以内区域   在使用xdata时需要在keil中开启“使用片内扩展RAM”
+// STC89C52RC   直接使用pdata即可 pdata无法超过256
+// 在使用片内扩展时都必须开启烧写器的“使用片内扩展RAM”的设置
 typedef uchar sbit;
 //extern sfr P0 = 0xFF;
 //extern sfr P1 = 0xFF;
@@ -358,38 +365,6 @@ void ArrayKeyScan()
                     }
                 }
             }
-
-            // 旧版 有隐藏的时序问题
-//            // 如果标记为“未按下”却检测到“接通”
-//            if (!(AKstate[i][j] & 0x2) && !GetColState(j))
-//            {
-//                if (AKstate[i][j] & 0x1)
-//                {
-//                    // 将上次标记为接通的设为按下
-//                    AKstate[i][j] = 0;
-//                    AKstate[i][j] |= 0x2;
-//                }
-//                else
-//                {
-//                    // 将上次未标记为接通的设为接通
-//                    AKstate[i][j] |= 0x1;
-//                }
-//            }
-//            // 如果标记为“按下”却检测到“未接通”
-//            if ((AKstate[i][j] & 0x2) && GetColState(j))
-//            {
-//                if (AKstate[i][j] & 0x1)
-//                {
-//                    // 将上次标记为未接通的设为未按下
-//                    AKstate[i][j] = 0;
-//                    AKstate[i][j] |= 0x0;
-//                }
-//                else
-//                {
-//                    // 将上次未标记为未接通的设为未接通
-//                    AKstate[i][j] |= 0x1;
-//                }
-//            }
         }
     }
 }
@@ -407,12 +382,12 @@ typedef struct
 typedef void (CallBack_Key)(CallBack_Key_Struct_Ptr CBKSP, uchar keynum);
 
 // 按键回调函数附属信息结构体表
-pdata
+xdata
 CallBack_Key_Struct KBKeySList[20] = {0};
 
 // 按键回调函数表
 // 前16个为矩阵键盘 0~15 后4个为板载键盘 16~19
-pdata
+xdata
 CallBack_Key *CBKeyList[20] = {null};
 
 // 板载键盘状态表
@@ -508,11 +483,6 @@ void CB_Backspace(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
     {
-        if (lock)
-        {
-            BEEP();
-            return;
-        }
         number /= 10;
     }
 }
@@ -658,13 +628,13 @@ void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 // 现在（上次）输入的是数字还是符号  数字0 符号1
 uchar FlagNF = 0;
 // 数字列表
-pdata
+xdata
 long NumberStack[StackDeep] = {0};
-pdata
+xdata
 uchar NumberLenStack[StackDeep] = {0};
 uchar NumberStackHead = 0;
 // 符号列表
-pdata
+xdata
 uchar FlagStack[StackDeep] = {0};
 uchar FlagStackHead = 0;
 
