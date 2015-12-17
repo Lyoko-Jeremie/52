@@ -472,24 +472,17 @@ void cbkf(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 }
 
 
-long number = 0;
+long ThisNumber = 0;
 
 uchar lock = 0;
 
-void CB_clear(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
-{
-    if (CBKSP->edge)
-    {
-        lock = 0;
-        number = 0;
-    }
-}
+uchar counted = 0;
 
 void CB_Backspace(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
     {
-        number /= 10;
+        ThisNumber /= 10;
     }
 }
 
@@ -498,74 +491,13 @@ void CB_Backspace(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 // 1 2 3 *
 // 0 B = /
 
-// < > C T
+// < > C D
 
 void CB_Test(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
     {
         BEEP();
-    }
-}
-
-void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
-{
-    uchar n = 0;
-    if (CBKSP->edge)
-    {
-        if (lock)
-        {
-            BEEP();
-            return;
-        }
-        switch (keynum)
-        {
-            case 0:
-                n = 7;
-                break;
-            case 1:
-                n = 8;
-                break;
-            case 2:
-                n = 9;
-                break;
-            case 4:
-                n = 4;
-                break;
-            case 5:
-                n = 5;
-                break;
-            case 6:
-                n = 6;
-                break;
-            case 8:
-                n = 1;
-                break;
-            case 9:
-                n = 2;
-                break;
-            case 10:
-                n = 3;
-                break;
-            case 12:
-                n = 0;
-                break;
-            default:
-                return;
-        }
-        // 溢出计算
-        // 裁掉最高位
-        if (214748355L <= number)
-        {
-            BEEP();
-            // 锁定计算
-            lock = 1;
-        }
-        else
-        {
-            number *= 10;
-            number += n;
-        }
     }
 }
 
@@ -589,28 +521,6 @@ int LEDlong = 0;
 // LED下标
 int LEDindex = 0;
 
-void flushLEDli()
-{
-    if (LEDindex < 0)
-    {
-        LEDindex = 0;
-    }
-    if (LEDlong < 0)
-    {
-        LEDlong = 0;
-    }
-    if (LEDlong <= 3)
-    {
-        LEDindex = 0;
-        return;
-    }
-    if (LEDlong < LEDindex)
-    {
-        LEDindex = LEDlong;
-        return;
-    }
-}
-
 void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     if (CBKSP->edge)
@@ -631,10 +541,8 @@ void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 
 // 符号栈与数字栈最大深度
 #define StackDeep 32
-// 保存压栈求值顺序  数字0 符号1
-// TODO 加入栈操作函数控制
-xdata
-uchar FlagNF[StackDeep * 3] = {0};
+
+//////    输入符号时  符号和当前数字同时压栈
 
 // 数字列表
 xdata
@@ -650,8 +558,8 @@ uchar FlagStack[StackDeep] = {0};
 // 表头位置
 uchar FlagStackHead = 0;
 
-// 栈内信息总长
-unsigned long InStackDataLenth = 0;
+// 栈内信息总长   显示总长=栈内总长+This总长
+int InStackDataLenth = 0;
 
 // 栈操作函数
 void PushNumber(long number)
@@ -692,76 +600,284 @@ void PopFlag()
     --InStackDataLenth;
 }
 
+void StackClear()
+{
+    NumberStackHead = 0;
+    FlagStackHead = 0;
+    InStackDataLenth = 0;
+}
+
+void flushLEDil()
+{
+    LEDlong = CountNumberLenth(ThisNumber) + InStackDataLenth;
+    if (LEDindex < 0)
+    {
+        LEDindex = 0;
+    }
+    if (LEDlong < 0)
+    {
+        LEDlong = 0;
+    }
+    if (LEDlong <= 3)
+    {
+        LEDindex = 0;
+        return;
+    }
+    if (LEDlong < LEDindex)
+    {
+        LEDindex = LEDlong;
+        return;
+    }
+}
+
+void CB_Clear(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        // TODO LED lock & 栈满
+        lock = 0;
+        ThisNumber = 0;
+        StackClear();
+    }
+}
+
+void CB_Delete(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    if (CBKSP->edge)
+    {
+        // TODO LED lock
+        lock = 0;
+        ThisNumber = 0;
+    }
+}
+
 
 void CB_Count(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
+    uchar i;
+    long temp;
+    if (CBKSP->edge)
+    {
+        PushNumber(ThisNumber);
+        // 将此当作计算寄存器
+        ThisNumber = NumberStack[0];
+        if (0 != NumberStackHead)
+        {
+            // 开始计算
+            for (i = 1; i != NumberStackHead; ++i)
+            {
+                switch (FlagStack[i - 1])
+                {
+                    case 11:
+                        ThisNumber += NumberStack[i];
+                        break;
+                    case 12:
+                        ThisNumber -= NumberStack[i];
+                        break;
+                    case 13:
+                        ThisNumber *= NumberStack[i];
+                        break;
+                    case 14:
+                        ThisNumber /= NumberStack[i];
+                        break;
+                    default:
+                        // 跳过
+                        break;
+                }
+            }
+        }
+        counted = 1;
+        lock = 0;
+        StackClear();
+    }
+}
+
+void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
+{
+    uchar n = 0;
     if (CBKSP->edge)
     {
         if (lock)
         {
             BEEP();
             return;
+        }
+        if (counted)
+        {
+            ThisNumber = 0;
+            counted = 0;
+        }
+        if (0 == ThisNumber && StackDeep == NumberStackHead)
+        {
+            // TODO LED 栈满
+            BEEP();
+            return;
+        }
+        switch (keynum)
+        {
+            case 0:
+                n = 7;
+                break;
+            case 1:
+                n = 8;
+                break;
+            case 2:
+                n = 9;
+                break;
+            case 4:
+                n = 4;
+                break;
+            case 5:
+                n = 5;
+                break;
+            case 6:
+                n = 6;
+                break;
+            case 8:
+                n = 1;
+                break;
+            case 9:
+                n = 2;
+                break;
+            case 10:
+                n = 3;
+                break;
+            case 12:
+                n = 0;
+                break;
+            default:
+                return;
+        }
+        // 溢出计算
+        // 裁掉最高位
+        if (214748355L <= ThisNumber)
+        {
+            // TODO LED lock
+            BEEP();
+            // 锁定计算
+            lock = 1;
+        }
+        else
+        {
+            ThisNumber *= 10;
+            ThisNumber += n;
         }
     }
 }
 
 void CB_Flag(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
+    uchar ThisFlag;
     if (CBKSP->edge)
     {
-        if (lock)
+        if (StackDeep == NumberStackHead)
         {
+            // TODO LED 栈满
             BEEP();
             return;
         }
         switch (keynum)
         {
             case 3:
-                // +
+                // + 11
+                ThisFlag = 11;
                 break;
             case 7:
-                // -
+                // - 12
+                ThisFlag = 12;
                 break;
             case 11:
-                // *
+                // * 13
+                ThisFlag = 13;
                 break;
             case 15:
-                // /
+                // / 14
+                ThisFlag = 14;
                 break;
             default:
                 return;
         }
+        PushNumber(ThisNumber);
+        PushFlag(ThisFlag);
     }
 }
 
+void ShowLED()
+{
+    uchar i, j;
+    long lsn;
+    //TODO
+    lsn = ThisNumber;
+    // 计算下标初值
+    for (i = 0; i != LEDindex; ++i)
+    {
+        lsn /= 10;
+    }
+    // 高位消隐
+    for (j = 0; i != LEDlong && j != 3; ++i, ++j)
+    {
+        SetLED(j, (uchar) (lsn % 10));
+        delayms(5);
+        lsn /= 10;
+    }
+
+}
 
 void init_key_list()
 {
     CBKeyList[0] = CB_appendN;
     CBKeyList[1] = CB_appendN;
     CBKeyList[2] = CB_appendN;
-    CBKeyList[3] = cbkf;    // +
+    CBKeyList[3] = CB_Flag;    // +
 
     CBKeyList[4] = CB_appendN;
     CBKeyList[5] = CB_appendN;
     CBKeyList[6] = CB_appendN;
-    CBKeyList[7] = cbkf;    // -
+    CBKeyList[7] = CB_Flag;    // -
 
     CBKeyList[8] = CB_appendN;
     CBKeyList[9] = CB_appendN;
     CBKeyList[10] = CB_appendN;
-    CBKeyList[11] = cbkf;   // *
+    CBKeyList[11] = CB_Flag;   // *
 
     CBKeyList[12] = CB_appendN;
     CBKeyList[13] = CB_Backspace;   // B
     CBKeyList[14] = CB_Count;   // =
-    CBKeyList[15] = cbkf;   // /
+    CBKeyList[15] = CB_Flag;   // /
 
     CBKeyList[16] = CB_move;   // <<
     CBKeyList[17] = CB_move;   // >>
-    CBKeyList[18] = CB_clear;   // C
-    CBKeyList[19] = CB_Test;    // T
+    CBKeyList[18] = CB_Clear;   // C
+    CBKeyList[19] = CB_Delete;    // D
 }
+
+
+void main()
+{
+
+    beep = 0;
+    init_key_list();
+
+    while (1)
+    {
+        ArrayKeyScan();
+
+        // 事件响应前置操作
+        BEEPflush();
+
+        // 回调函数调用响应事件
+        CallKeyCallBackFunction();
+
+        // 事件响应后置操作
+        flushLEDil();
+
+        ShowLED();
+
+
+    }
+
+}
+
 
 
 // + - * / LED debug
@@ -837,10 +953,10 @@ void init_key_list()
 //        CallKeyCallBackFunction();
 //
 //        // 事件响应后置操作
-//        LEDlong = CountNumberLenth(number);
+//        LEDlong = CountNumberLenth(ThisNumber);
 //        flushLEDli();
 //
-//        lsn = number;
+//        lsn = ThisNumber;
 //        // 计算下标初值
 //        for (i = 0; i != LEDindex; ++i)
 //        {
