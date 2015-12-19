@@ -112,6 +112,8 @@ uchar TranslateNumber(uchar Num)
             return 0x07;
         case 8:
             return 0x7F;
+        case 9:
+            return 0x6F;
         case 11:    // +
             return 0x70;
         case 12:    // -
@@ -504,9 +506,15 @@ void CB_Test(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 uchar CountNumberLenth(long number)
 {
     uchar len = 0;
-    while (number)
+    long temp = number;
+    if (temp < 0)
     {
-        number /= 10;
+        temp = -temp;
+        ++len;
+    }
+    while (temp)
+    {
+        temp /= 10;
         ++len;
     }
     if (0 == len)
@@ -609,7 +617,8 @@ void StackClear()
 
 void flushLEDil()
 {
-    LEDlong = CountNumberLenth(ThisNumber) + InStackDataLenth;
+//    LEDlong = CountNumberLenth(ThisNumber) + InStackDataLenth;
+    LEDlong = CountNumberLenth(ThisNumber);
     if (LEDindex < 0)
     {
         LEDindex = 0;
@@ -799,6 +808,7 @@ void CB_Flag(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
         }
         PushNumber(ThisNumber);
         PushFlag(ThisFlag);
+        ThisNumber = 0;
     }
 }
 
@@ -808,6 +818,10 @@ void ShowLED()
     long lsn;
     //TODO
     lsn = ThisNumber;
+    if (lsn < 0)
+    {
+        lsn = -lsn;
+    }
     // 计算下标初值
     for (i = 0; i != LEDindex; ++i)
     {
@@ -816,7 +830,13 @@ void ShowLED()
     // 高位消隐
     for (j = 0; i != LEDlong && j != 3; ++i, ++j)
     {
-        SetLED(j, (uchar) (lsn % 10));
+        if (ThisNumber < 0 && i == LEDlong - 1)
+        {
+            SetLED(j, (uchar) (12));
+        } else
+        {
+            SetLED(j, (uchar) (lsn % 10));
+        }
         delayms(5);
         lsn /= 10;
     }
