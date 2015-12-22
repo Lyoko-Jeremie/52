@@ -524,9 +524,9 @@ uchar CountNumberLenth(long number)
     return len;
 }
 
-// LED总长
+// LED总显示数据长
 int LEDlong = 0;
-// LED下标
+// LED显示数据初始下标
 int LEDindex = 0;
 
 void CB_move(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
@@ -617,8 +617,8 @@ void StackClear()
 
 void flushLEDil()
 {
-//    LEDlong = CountNumberLenth(ThisNumber) + InStackDataLenth;
-    LEDlong = CountNumberLenth(ThisNumber);
+    LEDlong = CountNumberLenth(ThisNumber) + InStackDataLenth;
+//    LEDlong = CountNumberLenth(ThisNumber);
     if (LEDindex < 0)
     {
         LEDindex = 0;
@@ -664,7 +664,6 @@ void CB_Delete(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 void CB_Count(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
 {
     uchar i;
-    long temp;
     if (CBKSP->edge)
     {
         PushNumber(ThisNumber);
@@ -812,35 +811,86 @@ void CB_Flag(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
     }
 }
 
-void ShowLED()
+// 当前显示的数字  当前数字的起始下标(同时是未显示的下标)  当前LED起始下标
+void showANum(long number, uchar TheNumberIndex, uchar TheLEDIndex)
 {
-    uchar i, j;
+    uchar i, ThisNumberLong;
     long lsn;
-    //TODO
-    lsn = ThisNumber;
+    lsn = number;
+    ThisNumberLong = CountNumberLenth(number);
     if (lsn < 0)
     {
         lsn = -lsn;
     }
     // 计算下标初值
-    for (i = 0; i != LEDindex; ++i)
+    for (i = 0; i != TheNumberIndex; ++i)
     {
         lsn /= 10;
     }
     // 高位消隐
-    for (j = 0; i != LEDlong && j != 3; ++i, ++j)
+    for (; i != ThisNumberLong && TheLEDIndex != 3; ++i, ++TheLEDIndex)
     {
-        if (ThisNumber < 0 && i == LEDlong - 1)
+        if (number < 0 && i == ThisNumberLong - 1)
         {
-            SetLED(j, (uchar) (12));
-        } else
+            SetLED(TheLEDIndex, (uchar) (12));
+        }
+        else
         {
-            SetLED(j, (uchar) (lsn % 10));
+            SetLED(TheLEDIndex, (uchar) (lsn % 10));
         }
         delayms(5);
         lsn /= 10;
     }
+    // 返回剩余LED长度  也可以直接在外部计算
 
+}
+
+// 显示的符号  LED下标
+void showAFlag(uchar flag, uchar TheLEDIndex)
+{
+    SetLED(TheLEDIndex, flag);
+}
+
+
+void ShowLED()
+{
+    int index = 0;
+    uchar i;
+    uchar ledindex = 0;
+    // 第一个数   当前数
+    index += CountNumberLenth(ThisNumber);
+    if (index >= LEDindex)
+    {
+        showANum(ThisNumber, 0, ledindex);
+    }
+    for (i = 0; i != NumberStackHead * 2; ++i)
+    {
+        if (index >= LEDlong)
+            break;
+        if (index > LEDindex + 3)
+            break;
+        if (1 == i % 2)
+        {
+            if (index + NumberLenStack[i / 2] >= LEDindex)
+            {
+
+                showANum(
+                        NumberStack[i / 2],
+                        (uchar) (LEDindex - index > 0 ? LEDindex - index : 0),
+                        (uchar) (index - LEDindex)
+                );
+            }
+            index += NumberLenStack[i];
+        }
+        else
+        {
+            if (index + 1 >= LEDindex)
+            {
+                showAFlag(FlagStack[i / 2], (uchar) (index - LEDindex));
+            }
+            ++index;
+        }
+    }
 }
 
 void init_key_list()
