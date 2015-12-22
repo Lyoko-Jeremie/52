@@ -634,7 +634,7 @@ void flushLEDil()
     }
     if (LEDlong < LEDindex)
     {
-        LEDindex = LEDlong;
+        LEDindex = LEDlong - 1;
         return;
     }
 }
@@ -696,6 +696,7 @@ void CB_Count(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
         }
         counted = 1;
         lock = 0;
+        LEDindex = 0;   // 重设显示下标偏移
         StackClear();
     }
 }
@@ -854,43 +855,80 @@ void showAFlag(uchar flag, uchar TheLEDIndex)
 
 void ShowLED()
 {
-    int index = 0;
-    uchar i;
-    uchar ledindex = 0;
+    int i;
+    int DataIndex = 0;  // 数据累计下标
+    uchar ledindex = 0;     // led 显示下标
     // 第一个数   当前数
-    index += CountNumberLenth(ThisNumber);
-    if (index >= LEDindex)
+    DataIndex += CountNumberLenth(ThisNumber);
+    if (DataIndex > LEDindex)
     {
-        showANum(ThisNumber, 0, ledindex);
+        showANum(ThisNumber, (uchar) (LEDindex), ledindex);
+        ledindex += CountNumberLenth(ThisNumber) - LEDindex;
     }
-    for (i = 0; i != NumberStackHead * 2; ++i)
-    {
-        if (index >= LEDlong)
-            break;
-        if (index > LEDindex + 3)
-            break;
-        if (1 == i % 2)
-        {
-            if (index + NumberLenStack[i / 2] >= LEDindex)
-            {
 
-                showANum(
-                        NumberStack[i / 2],
-                        (uchar) (LEDindex - index > 0 ? LEDindex - index : 0),
-                        (uchar) (index - LEDindex)
-                );
-            }
-            index += NumberLenStack[i];
-        }
-        else
+    for (i = 0; i != NumberStackHead; ++i)
+    {
+        if (DataIndex >= LEDindex + 3)
+            break;
+        if (ledindex >= 3)
+            break;
+        if (DataIndex + 1 > LEDindex)
         {
-            if (index + 1 >= LEDindex)
-            {
-                showAFlag(FlagStack[i / 2], (uchar) (index - LEDindex));
-            }
-            ++index;
+            //flag
+            showAFlag(FlagStack[NumberStackHead - i - 1], ledindex);
+            ++ledindex;
         }
+        ++DataIndex;
+        if (DataIndex >= LEDindex + 3)
+            break;
+        if (ledindex >= 3)
+            break;
+        if (DataIndex + NumberLenStack[NumberStackHead - i - 1] > LEDindex)
+        {
+            //number
+            showANum(
+                    NumberStack[NumberStackHead - i - 1],
+                    (uchar) (LEDindex - DataIndex < 0 ? 0 : LEDindex - DataIndex),
+                    ledindex
+            );
+            // 要附加减去实际未显示的长度 （只加上仅仅显示的长度）
+            ledindex += NumberLenStack[NumberStackHead - i - 1] -
+                        (LEDindex - DataIndex < 0 ? 0 : LEDindex - DataIndex);
+        }
+        DataIndex += NumberLenStack[NumberStackHead - i - 1];
     }
+
+
+
+//    for (i = NumberStackHead * 2 - 1; i >= 0; --i)
+//    {
+//        if (DataIndex >= LEDlong)
+//            break;
+//        if (ledindex > 3)
+//            break;
+//        if (1 != i % 2)
+//        {
+//            if (DataIndex + NumberLenStack[i / 2] >= LEDindex)
+//            {
+//                showANum(
+//                        NumberStack[i / 2],
+//                        (uchar) (LEDindex - DataIndex > 0 ? LEDindex - DataIndex : 0),
+//                        ledindex
+//                );
+//                ledindex += NumberLenStack[i];
+//            }
+//            DataIndex += NumberLenStack[i];
+//        }
+//        else
+//        {
+//            if (DataIndex + 1 >= LEDindex)
+//            {
+//                showAFlag(FlagStack[i / 2], ledindex);
+//                ++ledindex;
+//            }
+//            ++DataIndex;
+//        }
+//    }
 }
 
 void init_key_list()
@@ -942,7 +980,7 @@ void main()
         flushLEDil();
 
         ShowLED();
-
+//        showANum(ThisNumber, (uchar) (LEDindex), 0);
 
     }
 
