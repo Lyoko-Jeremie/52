@@ -770,6 +770,7 @@ void CB_appendN(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
         {
             ThisNumber *= 10;
             ThisNumber += n;
+            LEDindex = 0;   // 重设显示下标偏移
         }
     }
 }
@@ -809,6 +810,7 @@ void CB_Flag(CallBack_Key_Struct_Ptr CBKSP, uchar keynum)
         PushNumber(ThisNumber);
         PushFlag(ThisFlag);
         ThisNumber = 0;
+        LEDindex = 0;   // 重设显示下标偏移
     }
 }
 
