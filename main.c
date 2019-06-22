@@ -22,7 +22,7 @@
 //      使用pdata只能访问FFH以内区域   在使用xdata时需要在keil中开启“使用片内扩展RAM”
 // STC89C52RC   直接使用pdata即可 pdata无法超过256
 // 在使用片内扩展时都必须开启烧写器的“使用片内扩展RAM”的设置
-typedef uchar sbit;
+typedef volatile uchar sbit;
 //extern sfr P0 = 0xFF;
 //extern sfr P1 = 0xFF;
 //extern sfr P2 = 0xFF;
@@ -62,68 +62,80 @@ void delayms(uint x)
 
 
 
+// LED可显示最大长度（由硬件决定）   对应到TranslateFlag函数
+#define LEDLongLimited 4
+
 
 // LED 管脚
-// 片选从左往右 P1.3~P1.0 HI有效
+// 片选从左往右 P2.7~P2.4 LOW有效
 // 管脚a~j~dp P0.0~P0.7  HI有效
 
 uchar TranslateFlag(uchar F)
 {
     switch (F)
     {
-        case 0:
-            return 0xF9;
-        case 1:
-            return 0xFA;
+        case 3:
+            return 0xEF;    // 1110 1111
         case 2:
-            return 0xFC;
+            return 0xDF;    // 1101 1111
+        case 1:
+            return 0xBF;    // 1011 1111
+        case 0:
+            return 0x7F;    // 0111 1111
         default:
-            return 0xF8;
+            return 0xFF;    // 1111 1111
     }
 }
 
 uchar GetNextFlag(uchar *F)
 {
     ++*F;
-    *F %= 3;
+    *F %= LEDLongLimited;
     return TranslateFlag(*F);
 }
 
 
 uchar TranslateNumber(uchar Num)
 {
+    //  FAAAB
+    //  F   B
+    //  F   B
+    //  GGGGG
+    //  E   C
+    //  E   C
+    //  EDDDC   DP
     switch (Num)
     {
         case 0:
-            return 0x3F;
+            return 0x3F;    // 0011 1111    __FE DCBA
         case 1:
-            return 0x06;
+            return 0x06;    // 0000 0110    ____ _CB_
         case 2:
-            return 0x5B;
+            return 0x5B;    // ‭0101 1011    _G_E D_BA
         case 3:
-            return 0x4F;
+            return 0x4F;    // 0100 1111    _G__ DCBA
         case 4:
-            return 0x66;
+            return 0x66;    // 0110 0110    _GF_ _CB_
         case 5:
-            return 0x6D;
+            return 0x6D;    // 0110 1101    _GF_ DC_A
         case 6:
-            return 0x7D;
+            return 0x7D;    // 0111 1101    _GFE DC_A
         case 7:
-            return 0x07;
+            return 0x07;    // 0000 0111    ____ _CBA
         case 8:
-            return 0x7F;
+            return 0x7F;    // 0111 1111    _GFE DCBA
         case 9:
-            return 0x6F;
+            return 0x6F;    // 0110 1111    _GF_ DCBA
         case 11:    // +
-            return 0x70;
+            return 0x70;    // 0111 0000    _GFE ____
         case 12:    // -
-            return 0x40;
+            return 0x40;    // 0100 0000    _G__ ____
         case 13:    // *
-            return 0x76;
+            return 0x76;    // 0111 0110    _GFE _CB_
         case 14:    // /
-            return 0x64;
+            return 0x64;    // 0110 0100    _GF_ _C__
         default:
-            return 0x00;
+            return 0x00;    // 0000 0000    ____ ____
     }
 }
 
@@ -137,7 +149,7 @@ uchar GetNextNumber(uchar *N)
 
 void SetLED(uchar F, uchar Num)
 {
-    P1 = TranslateFlag(F);
+    P2 = TranslateFlag(F);
     P0 = TranslateNumber(Num);
 }
 
@@ -170,10 +182,10 @@ void setDB(uchar n, uchar mode)
 }
 
 
-sbit key1 = P3 ^3;
-sbit key2 = P3 ^4;
-sbit key3 = P3 ^6;
-sbit key4 = P3 ^7;
+sbit key1 = P3 ^0;
+sbit key2 = P3 ^1;
+sbit key3 = P3 ^2;
+sbit key4 = P3 ^3;
 
 uchar KeyIsDown(uchar n)
 {
@@ -442,7 +454,7 @@ void CallKeyCallBackFunction()
     }
 }
 
-sbit beep = P3 ^5;
+sbit beep = P3 ^7;
 uchar BEEPFlag = 0;
 
 void BEEP()
@@ -627,7 +639,7 @@ void flushLEDil()
     {
         LEDlong = 0;
     }
-    if (LEDlong <= 3)
+    if (LEDlong <= LEDLongLimited)   // TODO
     {
         LEDindex = 0;
         return;
@@ -831,7 +843,7 @@ void showANum(long number, uchar TheNumberIndex, uchar TheLEDIndex)
         lsn /= 10;
     }
     // 高位消隐
-    for (; i != ThisNumberLong && TheLEDIndex != 3; ++i, ++TheLEDIndex)
+    for (; i != ThisNumberLong && TheLEDIndex != LEDLongLimited; ++i, ++TheLEDIndex)     // TODO
     {
         if (number < 0 && i == ThisNumberLong - 1)
         {
@@ -870,9 +882,9 @@ void ShowLED()
 
     for (i = 0; i != NumberStackHead; ++i)
     {
-        if (DataIndex >= LEDindex + 3)
+        if (DataIndex >= LEDindex + LEDLongLimited)      // TODO
             break;
-        if (ledindex >= 3)
+        if (ledindex >= LEDLongLimited)      // TODO
             break;
         if (DataIndex + 1 > LEDindex)
         {
@@ -881,9 +893,9 @@ void ShowLED()
             ++ledindex;
         }
         ++DataIndex;
-        if (DataIndex >= LEDindex + 3)
+        if (DataIndex >= LEDindex + LEDLongLimited)      // TODO
             break;
-        if (ledindex >= 3)
+        if (ledindex >= LEDLongLimited)      // TODO
             break;
         if (DataIndex + NumberLenStack[NumberStackHead - i - 1] > LEDindex)
         {
@@ -906,7 +918,7 @@ void ShowLED()
 //    {
 //        if (DataIndex >= LEDlong)
 //            break;
-//        if (ledindex > 3)
+//        if (ledindex > LEDLongLimited)      // TODO
 //            break;
 //        if (1 != i % 2)
 //        {
@@ -962,31 +974,31 @@ void init_key_list()
 }
 
 
-void main()
-{
-
-    beep = 0;
-    init_key_list();
-
-    while (1)
-    {
-        ArrayKeyScan();
-
-        // 事件响应前置操作
-        BEEPflush();
-
-        // 回调函数调用响应事件
-        CallKeyCallBackFunction();
-
-        // 事件响应后置操作
-        flushLEDil();
-
-        ShowLED();
-//        showANum(ThisNumber, (uchar) (LEDindex), 0);
-
-    }
-
-}
+//void main()
+//{
+//
+//    beep = 0;
+//    init_key_list();
+//
+//    while (1)
+//    {
+//        ArrayKeyScan();
+//
+//        // 事件响应前置操作
+//        BEEPflush();
+//
+//        // 回调函数调用响应事件
+//        CallKeyCallBackFunction();
+//
+//        // 事件响应后置操作
+//        flushLEDil();
+//
+//        ShowLED();
+////        showANum(ThisNumber, (uchar) (LEDindex), 0);
+//
+//    }
+//
+//}
 
 
 
@@ -1073,7 +1085,7 @@ void main()
 //            lsn /= 10;
 //        }
 //        // 高位消隐
-//        for (j = 0; i != LEDlong && j != 3; ++i, ++j)
+//        for (j = 0; i != LEDlong && j != LEDLongLimited; ++i, ++j)
 //        {
 //            SetLED(j, (uchar) (lsn % 10));
 //            delayms(5);
@@ -1295,7 +1307,7 @@ void main()
 //            }
 //        }
 //        temp = n;
-//        for (i = 0; i != 3; ++i)
+//        for (i = 0; i != LEDLongLimited; ++i)
 //        {
 //            delayms(5);
 //            SetLED(i, (uchar) (temp % 10));
@@ -1399,7 +1411,7 @@ void main()
 //            num = 0;
 //
 //            P0 = 0x80;
-//            P1 = GetNextFlag(&f);
+//            P2 = GetNextFlag(&f);
 //            P0 = GetNextNumber(&n);
 //            n %= 3;
 //        }
@@ -1428,20 +1440,22 @@ void main()
 
 
 
-// LED 123
+// LED 1234
 //void main()
 //{
-//    uchar f = 2;
+//    uchar f = 2;  // begin
 //    uchar n = 0;
+//    uchar t;
 //    while (1)
 //    {
 //        delayms(5);
 //        P0 = 0x80;
-//        P1 = GetNextFlag(&f);
-//        P0 = GetNextNumber(&n);
-//        n %= 3;
+//        P2 = GetNextFlag(&f);
+//        t = GetNextNumber(&n);
+//        P0 = t;
+//        P1 = t;
+//        n %= LEDLongLimited;
 //    }
-//
 //}
 
 
@@ -1467,7 +1481,7 @@ void main()
 //    while (1)
 //    {
 //        delayms(500);
-//        P1 = GetNextFlag(&f);
+//        P2 = GetNextFlag(&f);
 //        P0 = GetNextNumber(&n);
 //    }
 //
@@ -1475,6 +1489,22 @@ void main()
 
 
 
+
+// LED test
+//void main()
+//{
+//    uchar n = 9;
+//    uchar t;
+//    while (1)
+//    {
+//        delayms(500);
+//        P2 = 0x0;
+//        t = GetNextNumber(&n);
+//        P0 = t;
+//        P1 = t;
+//        P3 = t;
+//    }
+//}
 
 
 
@@ -1501,6 +1531,208 @@ void main()
 //}
 
 
+// test flow led
+//void main() {
+//    uchar aa = 0xFE;
+//    while (1) {
+//        delayms(500);
+//        P0 = aa;
+//        P1 = aa;
+//        P2 = aa;
+//        P3 = aa;
+//        aa = _crol_(aa, 1);
+//    }
+//}
+
+
+// test flow led 2
+//void main() {
+//    uchar index = 0;
+//    while (1) {
+//        delayms(200);
+//        P0 = 0xFF;
+//        P1 = 0xFF;
+//        P2 = 0xFF;
+//        P3 = 0xFF;
+//
+//        if (index < 8) {
+//            P0 = _crol_(0xFE, index);
+//        }
+//        if (8 <= index && index < 16) {
+//            P1 = _crol_(0xFE, index - 8);
+//        }
+//        if (16 <= index && index < 24) {
+//            P2 = _crol_(0xFE, index - 16);
+//        }
+//        if (24 <= index && index < 32) {
+//            P3 = _crol_(0xFE, index - 24);
+//        }
+//
+//        ++index;
+////        if (32 <= index) {
+////            index = 0;
+////        }
+//        if (12 + 8 <= index) {
+//            index = 8;
+//        }
+//    }
+//}
+
+
+
+
+// flow led  with  4 key control
+sbit fcKey1 = P3^3;
+sbit fcKey2 = P3^4;
+sbit fcKey3 = P3^6;
+sbit fcKey4 = P3^7;
+// 按键低电平有效
+// LED排序：P1.0~P1.7~P2.0~P2.3  共12个  低电平点亮
+
+// key test
+//void main() {
+//    uchar state = 0;
+//    while (1) {
+//        if (!fcKey1) {
+//            state = 1;
+//        } else if (!fcKey2) {
+//            state = 2;
+//        } else if (!fcKey3) {
+//            state = 3;
+//        } else if (!fcKey4) {
+//            state = 4;
+//        }
+//        switch (state) {
+//            case 1:
+//                P1 = 0x01;
+//                break;
+//            case 2:
+//                P1 = 0x02;
+//                break;
+//            case 3:
+//                P1 = 0x04;
+//                break;
+//            case 4:
+//                P1 = 0x08;
+//                break;
+//            default:
+//                P1 = 0x0F;
+//        }
+//    }
+//}
+
+
+void main() {
+    uchar index = 0;    // 流水灯点亮状态  0~12
+    int state = 1;    // 1==逐个阳流水灯,   2==逐个阴流水灯,   3==间隔闪烁
+    int pause = 0;    // 是否暂停
+    int key4IsPress = 0;
+    while (1) {
+        // 暂停控制
+        // 如果已经暂停，就只能恢复后才能改变状态
+        if (!fcKey4) {
+            if (key4IsPress == 0) {
+                delayms(10);
+                if (!fcKey4) {
+                    pause = pause ? 0 : 1;
+                    key4IsPress = 1;
+                }
+            }
+        } else {
+            key4IsPress = 0;
+        }
+        if (pause == 1) {
+            continue;
+        }
+
+        delayms(200);
+
+        // 状态变化控制
+        if (!fcKey1 && state != 1) {
+            delayms(10);
+            if (!fcKey1) {
+                state = 1;
+            }
+        }
+        if (!fcKey2 && state != 2) {
+            delayms(10);
+            if (!fcKey2) {
+                state = 2;
+            }
+        }
+        if (!fcKey3 && state != 3) {
+            delayms(10);
+            if (!fcKey3) {
+                state = 3;
+            }
+        }
+
+        // 三种状态
+        if (state == 1) {
+            // 逐个阳流水灯
+
+            P1 = 0xFF;
+            P2 = 0xFF;
+
+            if (index < 8) {
+                P1 = _crol_(0xFE, index);
+            }
+            if (8 <= index && index < 16) {
+                P2 = _crol_(0xFE, index - 8);
+            }
+
+            ++index;
+            if (12 <= index) {
+                index = 0;
+            }
+        } else if (state == 2) {
+            // 逐个阴流水灯
+
+            P1 = 0x00;
+            P2 = 0x00;
+
+            if (index < 8) {
+                P1 = _crol_(0x01, index);
+            }
+            if (8 <= index && index < 16) {
+                P2 = _crol_(0x01, index - 8);
+            }
+
+            ++index;
+            if (12 <= index) {
+                index = 0;
+            }
+        } else if (state == 3) {
+            // 间隔闪烁
+
+            if (index % 2 == 0) {
+                P1 = 0xAA;  // 1010 1010
+                P2 = 0xAA;  // 1010 1010
+            } else {
+                P1 = 0x55;  // 0101 0101
+                P2 = 0x55;  // 0101 0101
+            }
+
+            ++index;
+            if (12 <= index) {
+                index = 0;
+            }
+        } else {
+            if (index % 2 == 0) {
+                P1 = 0xFF;
+                P2 = 0xFF;
+            } else {
+                P1 = 0x00;
+                P2 = 0x00;
+            }
+            ++index;
+            if (12 <= index) {
+                index = 0;
+            }
+            continue;
+        }
+    }
+}
 
 
 
